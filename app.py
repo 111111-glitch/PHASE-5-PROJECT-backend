@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from flask_cors import CORS, cross_origin
-from models import db, User,Admin
+from models import db, User,Admin, Product, Service
 from flask_migrate import Migrate
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker
@@ -234,3 +234,189 @@ def get_and_update_admin_info_by_id(id):
         except Exception as e:
             db.session.rollback()
             return jsonify({'error': f'Failed to update item: {str(e)}'}), 500
+
+# Client side
+
+@app.route('/userproducts', methods=['GET'])
+def get_user_products():
+    products = Product.query.all()
+
+    if request.method == 'GET':
+        return jsonify({product.to_dict for product in products}), 200
+    
+@app.route('/userservices', methods=['GET'])
+def get_user_services():
+    services = Service.query.all()
+
+    if request.method == 'GET':
+        return jsonify({service.to_dict for service in services}), 200
+    
+# Admin Side
+@app.route('/adminproducts', methods=['GET','POST','DELETE','PATCH'])
+def get_post_update_and_delete_products():
+    products = Product.query.all()
+
+    if request.method == 'GET':
+        return jsonify({product.to_dict for product in products}), 200
+    
+    if request.method == 'POST':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for create'}), 400
+        
+        # Input validation
+        required_fields = ['name', 'description', 'price', 'image_url', 'quantity_available']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        image_url = data.get('image_url')
+        quantity_available = data.get('quantity_available')
+
+        new_product = Product(
+            name=name,
+            description=description,
+            price=price,
+            image_url=image_url,
+            quantity_available=quantity_available,
+        )
+
+        try:
+            db.session.add(new_product)
+            db.session.commit()
+            return jsonify(new_product.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to create product: {str(e)}'}), 500
+        
+@app.route('/adminproducts/<int:id>', methods=['GET','PATCH','DELETE'])
+def get_update_and_delete_products():
+    session = db.session()
+    product = session.get(Product, id)
+
+    if request.method == 'GET':
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+        return jsonify(product.to_dict()), 200
+    
+    elif request.method == 'PATCH':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for update'}), 401
+
+        if not product:
+            return jsonify({'error': 'Item not found'}), 404
+        
+    
+        for key, value in data.items():
+            setattr(product, key, value)
+
+        try:
+            db.session.commit()
+            return jsonify(product.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update product: {str(e)}'}), 500
+        
+    elif request.method == 'DELETE':
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+
+        try:
+            db.session.delete(product)
+            db.session.commit()
+            return jsonify({'message': 'Product deleted successfully'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to delete product: {str(e)}'}), 500
+
+
+
+        
+@app.route('/adminservices', methods=['GET','POST','DELETE','PATCH'])
+def get_post_update_and_delete_services():
+    services = Service.query.all()
+
+    if request.method == 'GET':
+        return jsonify({service.to_dict for service in services}), 200
+    
+    if request.method == 'POST':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for create'}), 400
+        
+        # Input validation
+        required_fields = ['name', 'description', 'price', 'image_url', 'duration']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        image_url = data.get('image_url')
+        duration = data.get('duration')
+
+        new_service = Service(
+            name=name,
+            description=description,
+            price=price,
+            image_url=image_url,
+            duration=duration,
+        )
+
+        try:
+            db.session.add(new_service)
+            db.session.commit()
+            return jsonify(new_service.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to create service: {str(e)}'}), 500
+        
+@app.route('/adminservices/<int:id>', methods=['GET','PATCH','DELETE'])
+def get_update_and_delete_services():
+    session = db.session()
+    service = session.get(Service, id)
+
+    if request.method == 'GET':
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+        return jsonify(service.to_dict()), 200
+    
+    elif request.method == 'PATCH':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for update'}), 401
+
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+        
+    
+        for key, value in data.items():
+            setattr(service, key, value)
+
+        try:
+            db.session.commit()
+            return jsonify(service.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update service: {str(e)}'}), 500
+        
+    elif request.method == 'DELETE':
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+
+        try:
+            db.session.delete(service)
+            db.session.commit()
+            return jsonify({'message': 'Service deleted successfully'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to delete service: {str(e)}'}), 500
