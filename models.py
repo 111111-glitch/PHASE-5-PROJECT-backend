@@ -64,3 +64,23 @@ class Service(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f'<Product {self.name} from seller {self.seller_id}>'
+
+
+class ProductOrder(db.Model, SerializerMixin):
+
+    id = db.Column(db.Integer, primary_key=True)
+    total_price = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String, nullable=False)
+
+    def __repr__(self):
+        return f'<ProductOrder {self.id}>'
+    
+
+class ServiceOrder(db.Model, SerializerMixin):
+
+    id = db.Column(db.Integer, primary_key=True)
+    total_price = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String, nullable=False) 
+
+    def __repr__(self):
+        return f'<ServiceOrder {self.id}>'

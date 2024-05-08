@@ -250,7 +250,60 @@ def get_user_services():
 
     if request.method == 'GET':
         return jsonify({service.to_dict for service in services}), 200
+
+
+@app.route('/userproductsorders', methods=['GET','POST'])
+def get_post_productsorders():
+    productsorders = ProductOrder.query.all()
+
+    if request.method == 'GET':
+        return jsonify({productorder.to_dict for productorder in productsorders}), 200
     
+    if request.method == 'POST':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for create'}), 400
+        
+        # Input validation
+        required_fields = ['name', 'description', 'price', 'image_url', 'quantity_available']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        image_url = data.get('image_url')
+        quantity_available = data.get('quantity_available')
+
+
+@app.route('/userservicesorders', methods=['GET','POST'])
+def get_post_servicesorders():
+    servicesorders = ServiceOrder.query.all()
+
+    if request.method == 'GET':
+        return jsonify({serviceorder.to_dict for serviceorder in servicesorders}), 200
+    
+    if request.method == 'POST':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for create'}), 400
+        
+        # Input validation
+        required_fields = ['name', 'description', 'price', 'image_url', 'duration']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        image_url = data.get('image_url')
+        duration = data.get('duration')
+
+
 # Admin Side
 @app.route('/adminproducts', methods=['GET','POST','DELETE','PATCH'])
 def get_post_update_and_delete_products():
@@ -420,3 +473,60 @@ def get_update_and_delete_services():
         except Exception as e:
             db.session.rollback()
             return jsonify({'error': f'Failed to delete service: {str(e)}'}), 500
+
+
+@app.route('/adminproductsorders/<int:id>', methods=['GET','PATCH'])
+def get_update_productsorders():
+    session = db.session()
+    productorders = session.get(ProductOrder, ID)
+
+    if request.method == 'GET':
+        return jsonify({productorder.to_dict for productorder in productsorders}), 200
+    
+    elif request.method == 'PATCH':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for update'}), 401
+
+        if not productorder:
+            return jsonify({'error': 'Item not found'}), 404
+        
+        for key, value in data.items():
+            setattr(productorder, key, value)
+
+        try:
+            db.session.commit()
+            return jsonify(productorder.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update productorder: {str(e)}'}), 500
+
+ 
+@app.route('/adminservicesorders/<int:id>', methods=['GET','PATCH'])
+def get_update_servicesorders():
+    session = db.session()
+    serviceorders = session.get(ServiceOrder, ID)
+
+    if request.method == 'GET':
+        return jsonify({serviceorder.to_dict for serviceorder in servicesorders}), 200
+    
+    elif request.method == 'PATCH':
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'No data provided for update'}), 401
+
+        if not serviceorder:
+            return jsonify({'error': 'Item not found'}), 404
+        
+        for key, value in data.items():
+            setattr(serviceorder, key, value)
+
+        try:
+            db.session.commit()
+            return jsonify(serviceorder.to_dict()), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update serviceorder: {str(e)}'}), 500
+
