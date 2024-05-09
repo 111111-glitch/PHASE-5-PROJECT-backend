@@ -1,7 +1,7 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_restful import Api, Resource
 from flask_cors import CORS, cross_origin
-from models import db, User,Admin, Product, Service
+from models import db, User,Admin, Product, Service, ProductOrder, ServiceOrder, ServiceOrderItem, ProductOrderItem
 from flask_migrate import Migrate
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker
@@ -33,14 +33,14 @@ revoked_tokens = set()
 
 
 # Decorator for admin-only access
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        current_user = get_jwt_identity()
-        if current_user.get('role') != 'admin':
-            return jsonify({'error': 'Unauthorized'}), 403
-        return fn(*args, **kwargs)
-    return wrapper
+# def admin_required(fn):
+#     @wraps(fn)
+#     def wrapper(*args, **kwargs):
+#         current_user = get_jwt_identity()
+#         if current_user.get('role') != 'admin':
+#             return jsonify({'error': 'Unauthorized'}), 403
+#         return fn(*args, **kwargs)
+#     return wrapper
 
 # User Registration
 class UserRegister(Resource):
@@ -252,60 +252,116 @@ def get_user_services():
         return jsonify({service.to_dict for service in services}), 200
 
 
-@app.route('/userproductsorders', methods=['GET','POST'])
-def get_post_productsorders():
-    productsorders = ProductOrder.query.all()
+class ProductOrders(Resource):
+    @jwt_required()
+    def get(self):
+        #current_user_id = get_jwt_identity()
+        orders = ProductOrder.query.all()
 
-    if request.method == 'GET':
-        return jsonify({productorder.to_dict for productorder in productsorders}), 200
-    
-    if request.method == 'POST':
-        data = request.json
+        aggregated_orders = []
 
-        if not data:
-            return jsonify({'error': 'No data provided for create'}), 400
+        for order in orders:
+            order_details = {
+                'order_id': order.id,
+                'status': order.status,
+                'total_price': float(sum(item.product.price * item.quantity for item in order.order_items)),
+                'products': [{'name': item.product.name, 'quantity': item.quantity, 'image':item.product.image_url, 'price':item.product.price} for item in order.order_items]
+            }
+            aggregated_orders.append(order_details)
+
+       # print(aggregated_orders)
         
-        # Input validation
-        required_fields = ['name', 'description', 'price', 'image_url', 'quantity_available']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        return make_response(aggregated_orders, 200)
 
-        name = data.get('name')
-        description = data.get('description')
-        price = data.get('price')
-        image_url = data.get('image_url')
-        quantity_available = data.get('quantity_available')
+    @jwt_required()
+    def post(self):
 
-
-@app.route('/userservicesorders', methods=['GET','POST'])
-def get_post_servicesorders():
-    servicesorders = ServiceOrder.query.all()
-
-    if request.method == 'GET':
-        return jsonify({serviceorder.to_dict for serviceorder in servicesorders}), 200
-    
-    if request.method == 'POST':
         data = request.json
+        current_user_id = get_jwt_identity()
 
-        if not data:
-            return jsonify({'error': 'No data provided for create'}), 400
+        try:
+            new_order = ProductOrder(
+                user_id=current_user_id,
+                total_price=data["total"],
+                status="pending"
+            )
+            # incase of a list of items 
+            for item in data["items"]:
+                order_item = ProductOrderItem(
+                    product_id=item["id"],
+                    quantity=item["quantity"]
+                )
+                new_order.order_items.append(order_item)
+
+            db.session.add(new_order)
+            db.session.commit()
+
+            print("This is the new order", new_order)
+            return make_response(new_order.to_dict(only=("id","status", "total_price")), 201)
+
+        except Exception as e:
+            db.session.rollback()
+            return make_response(jsonify({"error": str(e)}), 400) 
         
-        # Input validation
-        required_fields = ['name', 'description', 'price', 'image_url', 'duration']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+api.add_resource(ProductOrders,"/productorders")
 
-        name = data.get('name')
-        description = data.get('description')
-        price = data.get('price')
-        image_url = data.get('image_url')
-        duration = data.get('duration')
+
+class ServiceOrders(Resource):
+    @jwt_required()
+    def get(self):
+        #current_user_id = get_jwt_identity()
+        orders = ServiceOrder.query.all()
+
+        aggregated_orders = []
+
+        for order in orders:
+            order_details = {
+                'order_id': order.id,
+                'status': order.status,
+                'total_price': float(sum(item.product.price * item.quantity for item in order.order_items)),
+                'products': [{'name': item.product.name, 'quantity': item.quantity, 'image':item.product.image_url, 'price':item.product.price} for item in order.order_items]
+            }
+            aggregated_orders.append(order_details)
+
+       # print(aggregated_orders)
+        
+        return make_response(aggregated_orders, 200)
+
+    @jwt_required()
+    def post(self):
+
+        data = request.json
+        current_user_id = get_jwt_identity()
+
+        try:
+            new_order = ServiceOrder(
+                user_id=current_user_id,
+                total_price=data["total"],
+                status="pending"
+            )
+            # incase of a list of items 
+            for item in data["items"]:
+                order_item = ServiceOrderItem(
+                    product_id=item["id"],
+                    quantity=item["quantity"]
+                )
+                new_order.order_items.append(order_item)
+
+            db.session.add(new_order)
+            db.session.commit()
+
+            print("This is the new order", new_order)
+            return make_response(new_order.to_dict(only=("id","status", "total_price")), 201)
+
+        except Exception as e:
+            db.session.rollback()
+            return make_response(jsonify({"error": str(e)}), 400) 
+        
+api.add_resource(ServiceOrders,"/serviceorders")
 
 
 # Admin Side
-@app.route('/adminproducts', methods=['GET','POST','DELETE','PATCH'])
+@app.route('/adminproducts', methods=['GET','POST'])
 def get_post_update_and_delete_products():
     products = Product.query.all()
 
@@ -347,7 +403,7 @@ def get_post_update_and_delete_products():
             return jsonify({'error': f'Failed to create product: {str(e)}'}), 500
         
 @app.route('/adminproducts/<int:id>', methods=['GET','PATCH','DELETE'])
-def get_update_and_delete_products():
+def get_update_and_delete_products(id):
     session = db.session()
     product = session.get(Product, id)
 
@@ -391,7 +447,7 @@ def get_update_and_delete_products():
 
 
         
-@app.route('/adminservices', methods=['GET','POST','DELETE','PATCH'])
+@app.route('/adminservices', methods=['GET','POST'])
 def get_post_update_and_delete_services():
     services = Service.query.all()
 
@@ -433,7 +489,7 @@ def get_post_update_and_delete_services():
             return jsonify({'error': f'Failed to create service: {str(e)}'}), 500
         
 @app.route('/adminservices/<int:id>', methods=['GET','PATCH','DELETE'])
-def get_update_and_delete_services():
+def get_update_and_delete_services(id):
     session = db.session()
     service = session.get(Service, id)
 
@@ -475,58 +531,69 @@ def get_update_and_delete_services():
             return jsonify({'error': f'Failed to delete service: {str(e)}'}), 500
 
 
-@app.route('/adminproductsorders/<int:id>', methods=['GET','PATCH'])
-def get_update_productsorders():
-    session = db.session()
-    productorders = session.get(ProductOrder, ID)
-
-    if request.method == 'GET':
-        return jsonify({productorder.to_dict for productorder in productsorders}), 200
-    
-    elif request.method == 'PATCH':
-        data = request.json
-
-        if not data:
-            return jsonify({'error': 'No data provided for update'}), 401
-
-        if not productorder:
-            return jsonify({'error': 'Item not found'}), 404
-        
-        for key, value in data.items():
-            setattr(productorder, key, value)
-
+class AdminProductOrders(Resource):
+    def get(self):
         try:
-            db.session.commit()
-            return jsonify(productorder.to_dict()), 200
+            orders = ProductOrder.query.all()
+
+            orders_data = []
+            for order in orders:
+                order_info = {
+                    'order_id': order.id,
+                    'total_price': order.total_price,
+                    'user_id': order.user_id,
+                    'status': order.status,
+                    'items': []
+                }
+
+                # Eager loading to retrieve order items
+                order_items = ProductOrderItem.query.filter_by(product_order_id=order.id).all()
+                for item in order_items:
+                    order_info['items'].append({
+                        'product_name': item.product.name,
+                        'quantity': item.quantity,
+                        'product_price': item.product.price,
+                        'product_id': item.product.id
+                    })
+
+                orders_data.append(order_info)
+
+            return jsonify(orders_data), 200
         except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': f'Failed to update productorder: {str(e)}'}), 500
+            return {'message': 'Failed to fetch product orders', 'error': str(e)}, 500
 
- 
-@app.route('/adminservicesorders/<int:id>', methods=['GET','PATCH'])
-def get_update_servicesorders():
-    session = db.session()
-    serviceorders = session.get(ServiceOrder, ID)
+api.add_resource(AdminProductOrders, '/adminProductOrders')
 
-    if request.method == 'GET':
-        return jsonify({serviceorder.to_dict for serviceorder in servicesorders}), 200
-    
-    elif request.method == 'PATCH':
-        data = request.json
-
-        if not data:
-            return jsonify({'error': 'No data provided for update'}), 401
-
-        if not serviceorder:
-            return jsonify({'error': 'Item not found'}), 404
-        
-        for key, value in data.items():
-            setattr(serviceorder, key, value)
-
+class AdminServiceOrders(Resource):
+    def get(self):
         try:
-            db.session.commit()
-            return jsonify(serviceorder.to_dict()), 200
+            orders = ServiceOrder.query.all()
+
+            orders_data = []
+            for order in orders:
+                order_info = {
+                    'order_id': order.id,
+                    'total_price': order.total_price,
+                    'user_id': order.user_id,
+                    'status': order.status,
+                    'items': []
+                }
+
+                # Eager loading to retrieve order items
+                order_items = ServiceOrderItem.query.filter_by(service_order_id=order.id).all()
+                for item in order_items:
+                    order_info['items'].append({
+                        'service_name': item.service.name,
+                        'quantity': item.quantity,
+                        'service_price': item.service.price,
+                        'service_id': item.service.id
+                    })
+
+                orders_data.append(order_info)
+
+            return jsonify(orders_data), 200
         except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': f'Failed to update serviceorder: {str(e)}'}), 500
+            return {'message': 'Failed to fetch service orders', 'error': str(e)}, 500
+
+api.add_resource(AdminServiceOrders, '/adminServiceOrders')
 
