@@ -152,3 +152,22 @@ class ServiceOrder(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f'<ServiceOrder {self.id}>'
+    
+class ServiceOrderItem(db.Model, SerializerMixin):
+    __tablename__ = "serviceorderitems"
+
+    id = db.Column(db.Integer, primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+
+    service_order_id = db.Column(db.Integer, db.ForeignKey('serviceorders.id'), nullable=False)
+    service_id = db.Column(db.Integer, db.ForeignKey('services.id'), nullable=False)
+
+    #Added service_order and service relationships to the ServiceOrderItem model to represent the order and service associated with each item, respectively.
+    service_order = relationship("ServiceOrder", back_populates="service_order_items")
+    service = relationship("Service", back_populates="service_order_items")
+
+    # Serialization rules to avoid recursion
+    serialize_rules = ('-service_order.service_order_items', '-service.service_order_items')
+
+    def __repr__(self):
+        return f'< {self.id}>'
