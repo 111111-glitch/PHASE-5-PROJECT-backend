@@ -69,7 +69,7 @@ class UserRegister(Resource):
             email=email, 
             phone_number=phone_number, 
             password=hashed_pw,
-            role='user'
+            role='client'
         )
 
         db.session.add(new_user)
@@ -103,7 +103,7 @@ class UserLogin(Resource):
             return jsonify({'error': 'Unauthorized, incorrect password'}), 401
         
         # Generate access token with role included
-        access_token = create_access_token(identity={'username': username, 'role': 'user'})
+        access_token = create_access_token(identity={'username': username, 'role': 'client'})
 
         return jsonify({
             "id": user.id,

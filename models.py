@@ -13,6 +13,10 @@ class Admin(db.Model, SerializerMixin):
     username = db.Column(db.String, nullable=False, unique=True)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.String, nullable=False, default='admin')
+
+    products = relationship("Product", back_populates="seller")
+    services = relationship("Service", back_populates="seller")
 
     @validates('password')
     def validate_password(self, key, password):
@@ -31,7 +35,11 @@ class User(db.Model, SerializerMixin):
     email = db.Column(db.String, nullable=False, unique=True)
     phone_number = db.Column(db.Integer, unique=True, nullable=False)
     password = db.Column(db.String(80), nullable=False)
-    confirm_password = db.Column(db.String(80), nullable=False)
+    confirm_password = db.Column(db.String(80), nullable=True)
+    role = db.Column(db.String, nullable=False, default='client')
+
+    productorders = relationship("ProductOrder", back_populates="user")
+    serviceorders = relationship("ServiceOrder", back_populates="user")
 
     @validates('password')
     def validate_password(self, key, password):
@@ -63,6 +71,7 @@ class Product(db.Model, SerializerMixin):
 
     # Added a relationship attribute seller to the Product model to access the seller of the product.
     seller = relationship("Admin", back_populates="products")
+    product_order_items = relationship("ProductOrderItem", back_populates="product")
 
     serialize_rules = ('-seller.products', '-product_order_items.product')
 
@@ -80,11 +89,10 @@ class ProductOrder(db.Model, SerializerMixin):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Added a relationship attribute user to the ProductOrder model to access the user who placed the order.
-    user = relationship("User", back_populates="orders")
+    user = relationship("User", back_populates="productorders")
 
     #Added order_items relationship to the ProductOrder model to represent the items in the order.
-    product_order_items = relationship("ProductOrderItem", back_populates="order")
-
+    product_order_items = relationship("ProductOrderItem", back_populates="product_order")
     serialize_rules = ('-user.orders', '-product_order_items.order')
 
     def __repr__(self):
@@ -125,6 +133,7 @@ class Service(db.Model, SerializerMixin):
 
     # Added a relationship attribute seller to the Service model to access the seller of the service.
     seller = relationship("Admin", back_populates="services")
+    service_order_items = relationship("ServiceOrderItem", back_populates="service")
 
     serialize_rules = ('-seller.services', '-service_order_items.service')
 
@@ -143,10 +152,10 @@ class ServiceOrder(db.Model, SerializerMixin):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Added a relationship attribute user to the ServiceOrder model to access the user who placed the order.
-    user = relationship("User", back_populates="orders")
+    user = relationship("User", back_populates="serviceorders")
 
     #Added order_items relationship to the ServiceOrder model to represent the items in the order.
-    service_order_items = relationship("ServiceOrderItem", back_populates="order")
+    service_order_items = relationship("ServiceOrderItem", back_populates="service_order")
 
     serialize_rules = ('-user.orders', '-service_order_items.order')
 
