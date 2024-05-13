@@ -28,3 +28,7 @@ Order a service
 View all cart items
 Checkout items from the cart
 Pay for services and products.
+
+Technical expectations
+Backend: Flask Python
+Testing: ​Pytest
