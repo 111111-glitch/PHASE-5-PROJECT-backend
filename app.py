@@ -236,21 +236,51 @@ def get_and_update_admin_info_by_id(id):
             return jsonify({'error': f'Failed to update item: {str(e)}'}), 500
 
 # Client side
-
 @app.route('/userproducts', methods=['GET'])
 def get_user_products():
-    products = Product.query.all()
+    if request.method == 'GET':
+        name = request.args.get('name')
+
+        if name:
+            # Perform search by name
+            products = Product.query.filter(Product.name.ilike(f'%{name}%')).all()
+        else:
+            products = Product.query.all()
+
+        return jsonify({product.to_dict() for product in products}), 200
+
+@app.route('/userproducts/<int:id>', methods=['GET'])
+def get_products_by_id(id):
+    session = db.session()
+    product = session.get(Product, id)
 
     if request.method == 'GET':
-        return jsonify({product.to_dict for product in products}), 200
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+        return jsonify(product.to_dict()), 200
     
 @app.route('/userservices', methods=['GET'])
 def get_user_services():
-    services = Service.query.all()
+    if request.method == 'GET':
+        name = request.args.get('name')
+
+        if name:
+            services = Service.query.filter(Service.name.ilike(f'%{name}%')).all()
+
+        else:
+            services = Service.query.all()
+
+        return jsonify({service.to_dict() for service in services}), 200
+
+@app.route('userservices/<int:id>', methods=['GET'])
+def get_user_services_by_id(id):
+    session = db.session()
+    service = session.get(Service, id)
 
     if request.method == 'GET':
-        return jsonify({service.to_dict for service in services}), 200
-
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+        return jsonify(service.to_dict()),200
 
 class ProductOrders(Resource):
     @jwt_required()
