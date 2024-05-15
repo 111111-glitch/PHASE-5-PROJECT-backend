@@ -272,7 +272,7 @@ def get_user_services():
 
         return jsonify({service.to_dict() for service in services}), 200
 
-@app.route('userservices/<int:id>', methods=['GET'])
+@app.route('/userservices/<int:id>', methods=['GET'])
 def get_user_services_by_id(id):
     session = db.session()
     service = session.get(Service, id)
@@ -405,12 +405,13 @@ def get_post_update_and_delete_products():
             return jsonify({'error': 'No data provided for create'}), 400
         
         # Input validation
-        required_fields = ['name', 'description', 'price', 'image_url', 'quantity_available']
+        required_fields = ['pet','name', 'description', 'price', 'image_url', 'quantity_available']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
 
         name = data.get('name')
+        pet = data.get('pet')
         description = data.get('description')
         price = data.get('price')
         image_url = data.get('image_url')
@@ -418,6 +419,7 @@ def get_post_update_and_delete_products():
 
         new_product = Product(
             name=name,
+            pet=pet,
             description=description,
             price=price,
             image_url=image_url,
@@ -491,12 +493,13 @@ def get_post_update_and_delete_services():
             return jsonify({'error': 'No data provided for create'}), 400
         
         # Input validation
-        required_fields = ['name', 'description', 'price', 'image_url', 'duration']
+        required_fields = ['pet','name', 'description', 'price', 'image_url', 'duration']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
 
         name = data.get('name')
+        pet = data.get('pet')
         description = data.get('description')
         price = data.get('price')
         image_url = data.get('image_url')
@@ -504,6 +507,7 @@ def get_post_update_and_delete_services():
 
         new_service = Service(
             name=name,
+            pet=pet,
             description=description,
             price=price,
             image_url=image_url,

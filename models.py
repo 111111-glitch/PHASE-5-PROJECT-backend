@@ -18,6 +18,8 @@ class Admin(db.Model, SerializerMixin):
     products = relationship("Product", back_populates="seller")
     services = relationship("Service", back_populates="seller")
 
+    serialize_rules = ('-products.seller', '-services.seller')
+
     @validates('password')
     def validate_password(self, key, password):
         if len(password) < 8:
@@ -41,6 +43,8 @@ class User(db.Model, SerializerMixin):
     productorders = relationship("ProductOrder", back_populates="user")
     serviceorders = relationship("ServiceOrder", back_populates="user")
 
+    serialize_rules = ('-productorders.user', '-serviceorders.user')
+
     @validates('password')
     def validate_password(self, key, password):
         if len(password) < 8:
@@ -60,6 +64,7 @@ class Product(db.Model, SerializerMixin):
     __tablename__ = "products"
 
     id = db.Column(db.Integer, primary_key=True)
+    pet=db.Column(db.String, nullable=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.Text, nullable=False)
     price = db.Column(db.Float, nullable=False)
@@ -73,7 +78,7 @@ class Product(db.Model, SerializerMixin):
     seller = relationship("Admin", back_populates="products")
     product_order_items = relationship("ProductOrderItem", back_populates="product")
 
-    serialize_rules = ('-seller.products', '-product_order_items.product')
+    serialize_rules = ('-product_order_items.product', '-seller.products.product_order_items')
 
     def __repr__(self):
         return f'<Product {self.name} from seller {self.seller_id}>'
@@ -93,7 +98,8 @@ class ProductOrder(db.Model, SerializerMixin):
 
     #Added order_items relationship to the ProductOrder model to represent the items in the order.
     product_order_items = relationship("ProductOrderItem", back_populates="product_order")
-    serialize_rules = ('-user.orders', '-product_order_items.order')
+
+    serialize_rules = ('-product_order_items.order', '-user.productorders.product_order_items')
 
     def __repr__(self):
         return f'<ProductOrder {self.id}>'
@@ -111,7 +117,7 @@ class ProductOrderItem(db.Model, SerializerMixin):
     product_order = relationship("ProductOrder", back_populates="product_order_items")
     product = relationship("Product", back_populates="product_order_items")
 
-    serialize_rules = ('-product_order.product_order_items', '-product.product_order_items')
+    serialize_rules = ('-product_order.product_order_items.product', '-product.product_order_items')
 
 
     def __repr__(self):
@@ -122,6 +128,7 @@ class Service(db.Model, SerializerMixin):
     __tablename__ = "services"
 
     id = db.Column(db.Integer, primary_key=True)
+    pet=db.Column(db.String, nullable=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.Text, nullable=False)
     price = db.Column(db.Float, nullable=False)
@@ -135,7 +142,7 @@ class Service(db.Model, SerializerMixin):
     seller = relationship("Admin", back_populates="services")
     service_order_items = relationship("ServiceOrderItem", back_populates="service")
 
-    serialize_rules = ('-seller.services', '-service_order_items.service')
+    serialize_rules = ('-service_order_items.service', '-seller.services.service_order_items')
 
     def __repr__(self):
         return f'<Product {self.name} from seller {self.seller_id}>'
@@ -157,7 +164,7 @@ class ServiceOrder(db.Model, SerializerMixin):
     #Added order_items relationship to the ServiceOrder model to represent the items in the order.
     service_order_items = relationship("ServiceOrderItem", back_populates="service_order")
 
-    serialize_rules = ('-user.orders', '-service_order_items.order')
+    serialize_rules = ('-service_order_items.order', '-user.serviceorders.service_order_items')
 
     def __repr__(self):
         return f'<ServiceOrder {self.id}>'
@@ -176,7 +183,7 @@ class ServiceOrderItem(db.Model, SerializerMixin):
     service = relationship("Service", back_populates="service_order_items")
 
     # Serialization rules to avoid recursion
-    serialize_rules = ('-service_order.service_order_items', '-service.service_order_items')
+    serialize_rules = ('-service_order.service_order_items.service', '-service.service_order_items')
 
     def __repr__(self):
         return f'< {self.id}>'
