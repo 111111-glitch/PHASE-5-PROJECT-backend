@@ -45,7 +45,7 @@ Database: MySQL
 
 -Leila Abdi - Frontend
 
--Joseph Wambui - Frontend
+-Joseph Wambui 3 - Frontend
 
 
 ### Technologies Used
