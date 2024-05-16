@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, make_response
 from flask_restful import Api, Resource
 from flask_cors import CORS, cross_origin
-from models import db, User,Admin, Product, Service, ProductOrder, ServiceOrder, ServiceOrderItem, ProductOrderItem
+from models import db, User,Admin, Product, Service, ProductOrder, ServiceOrder, ServiceOrderItem, ProductOrderItem, ShippingAddress,Cart, CartItem
 from flask_migrate import Migrate
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker
@@ -285,8 +285,9 @@ def get_user_services_by_id(id):
 class ProductOrders(Resource):
     @jwt_required()
     def get(self):
-        #current_user_id = get_jwt_identity()
-        orders = ProductOrder.query.all()
+
+        current_user_id = get_jwt_identity()
+        orders = ProductOrder.query.filter_by(user_id=current_user_id).all()
 
         aggregated_orders = []
 
@@ -294,12 +295,10 @@ class ProductOrders(Resource):
             order_details = {
                 'order_id': order.id,
                 'status': order.status,
-                'total_price': float(sum(item.product.price * item.quantity for item in order.order_items)),
-                'products': [{'name': item.product.name, 'quantity': item.quantity, 'image':item.product.image_url, 'price':item.product.price} for item in order.order_items]
+                'total_price': float(sum(item.product.price * item.quantity for item in order.product_order_items)),
+                'products': [{'name': item.product.name, 'quantity': item.quantity, 'image':item.product.image_url, 'price':item.product.price} for item in order.product_order_items]
             }
             aggregated_orders.append(order_details)
-
-       # print(aggregated_orders)
         
         return make_response(aggregated_orders, 200)
 
@@ -310,37 +309,44 @@ class ProductOrders(Resource):
         current_user_id = get_jwt_identity()
 
         try:
-            new_order = ProductOrder(
+            new_product_order = ProductOrder(
                 user_id=current_user_id,
-                total_price=data["total"],
+                total_price=data.get("total"),
                 status="pending"
             )
             # incase of a list of items 
-            for item in data["items"]:
-                order_item = ProductOrderItem(
-                    product_id=item["id"],
-                    quantity=item["quantity"]
-                )
-                new_order.order_items.append(order_item)
+            for item in data.get("items", []):
+                product_id=item.get("id"),
+                quantity=item.get("quantity")
+                
 
-            db.session.add(new_order)
+                if product_id is None or quantity is None:
+                    raise ValueError("Missing service ID or quantity")\
+                    
+                product_order_item = ProductOrderItem(
+                        service_id=product_id,
+                        quantity=quantity
+                )
+                new_product_order.order_items.append(product_order_item)
+
+            db.session.add(new_product_order)
             db.session.commit()
 
-            print("This is the new order", new_order)
-            return make_response(new_order.to_dict(only=("id","status", "total_price")), 201)
+            print("This is the new product order", new_product_order)
+            return make_response(new_product_order.to_dict(only=("id","status", "total_price")), 201)
 
         except Exception as e:
             db.session.rollback()
             return make_response(jsonify({"error": str(e)}), 400) 
         
-api.add_resource(ProductOrders,"/productorders")
+api.add_resource(ProductOrders,"/userProductOrders")
 
 
 class ServiceOrders(Resource):
     @jwt_required()
     def get(self):
-        #current_user_id = get_jwt_identity()
-        orders = ServiceOrder.query.all()
+        current_user_id = get_jwt_identity()
+        orders = ServiceOrder.query.filter_by(user_id=current_user_id).all()
 
         aggregated_orders = []
 
@@ -348,46 +354,257 @@ class ServiceOrders(Resource):
             order_details = {
                 'order_id': order.id,
                 'status': order.status,
-                'total_price': float(sum(item.product.price * item.quantity for item in order.order_items)),
-                'products': [{'name': item.product.name, 'quantity': item.quantity, 'image':item.product.image_url, 'price':item.product.price} for item in order.order_items]
+                'total_price': float(sum(item.service.price * item.quantity for item in order.service_order_items)),
+                'services': [{'name': item.service.name, 'quantity': item.quantity, 'image': item.service.image_url, 'price': item.service.price} for item in order.service_order_items]
             }
             aggregated_orders.append(order_details)
 
-       # print(aggregated_orders)
-        
         return make_response(aggregated_orders, 200)
 
     @jwt_required()
     def post(self):
-
-        data = request.json
         current_user_id = get_jwt_identity()
+        data = request.json
 
         try:
-            new_order = ServiceOrder(
+            new_service_order = ServiceOrder(
                 user_id=current_user_id,
-                total_price=data["total"],
+                total_price=data.get("total", 0),
                 status="pending"
             )
-            # incase of a list of items 
-            for item in data["items"]:
-                order_item = ServiceOrderItem(
-                    product_id=item["id"],
-                    quantity=item["quantity"]
-                )
-                new_order.order_items.append(order_item)
 
-            db.session.add(new_order)
+            for item in data.get("items", []):
+                service_id = item.get("id")
+                quantity = item.get("quantity")
+                
+                if service_id is None or quantity is None:
+                    raise ValueError("Missing service ID or quantity")
+
+                order_item = ServiceOrderItem(
+                    service_id=service_id,
+                    quantity=quantity
+                )
+                new_service_order.order_items.append(order_item)
+
+            db.session.add(new_service_order)
             db.session.commit()
 
-            print("This is the new order", new_order)
-            return make_response(new_order.to_dict(only=("id","status", "total_price")), 201)
+            print("This is the new service order", new_service_order)
+            return make_response(new_service_order.to_dict(only=("id","status", "total_price")), 201)
 
         except Exception as e:
             db.session.rollback()
-            return make_response(jsonify({"error": str(e)}), 400) 
+            return make_response(jsonify({"error": str(e)}), 400)
+
+api.add_resource(ServiceOrders, '/userServiceOrders')
+
+class ShoppingCart(Resource):
+    @jwt_required()
+    def get(self):
+        # Retrieve current user's ID
+        current_user_id = get_jwt_identity()
+
+        # Query database to find the user's cart
+        user_cart = Cart.query.filter_by(user_id=current_user_id).first()
+
+        if user_cart:
+            # Serialize the user's cart
+            serialized_cart = user_cart.to_dict()
+
+            # Optionally, include cart items
+            serialized_cart_items = []
+            for cart_item in user_cart.cart_items:
+                serialized_cart_item = cart_item.to_dict()
+                serialized_cart_items.append(serialized_cart_item)
+
+            # Add cart items to the serialized cart
+            serialized_cart['cart_items'] = serialized_cart_items
+
+            # Return serialized cart as JSON response
+            return jsonify(serialized_cart), 200
+        else:
+            return {'message': 'Cart not found'}, 404
         
-api.add_resource(ServiceOrders,"/serviceorders")
+    def post(self):
+        current_user_id = get_jwt_identity()
+        data = request.json
+
+        try:
+            # Extract product or service ID and quantity from request data
+            product_id = data.get('product_id')
+            service_id = data.get('service_id')
+            quantity = data.get('quantity')
+
+            # Ensure that either product_id or service_id is provided
+            if product_id:
+                if not Product.query.filter_by(id=product_id).first():
+                    raise ValueError('Product with provided ID not found')
+            elif service_id:
+                if not Service.query.filter_by(id=service_id).first():
+                    raise ValueError('Service with provided ID not found')
+            else:
+                raise ValueError('Either product_id or service_id must be provided')
+
+            # Create a new cart item object based on the presence of product_id or service_id
+            if product_id:
+                new_cart_item = CartItem(
+                    cart_id=current_user_id,
+                    product_id=product_id,
+                    quantity=quantity
+                )
+            elif service_id:
+                new_cart_item = CartItem(
+                    cart_id=current_user_id,
+                    service_id=service_id,
+                    quantity=quantity
+                )
+
+            # Add the new cart item to the user's cart
+            db.session.add(new_cart_item)
+
+            # Commit the changes to the database
+            db.session.commit()
+
+            # Serialize the new cart item
+            serialized_cart_item = new_cart_item.to_dict()
+
+            # Return the serialized cart item as the response
+            return jsonify(serialized_cart_item), 201
+
+        except Exception as e:
+            db.session.rollback()
+            return {'error': str(e)}, 400
+        
+    def patch(self, item_id):
+        current_user_id = get_jwt_identity()
+        data = request.json
+
+        try:
+            # Extract updated quantity from request data
+            updated_quantity = data.get('quantity')
+
+            # Find the cart item with the specified item_id belonging to the current user
+            cart_item = CartItem.query.filter_by(id=item_id, cart_id=current_user_id).first()
+
+            if cart_item:
+                # Update the quantity of the cart item
+                cart_item.quantity = updated_quantity
+
+                # Commit the changes to the database
+                db.session.commit()
+
+                # Serialize the updated cart item
+                serialized_cart_item = cart_item.to_dict()
+
+                # Return the serialized cart item as the response
+                return jsonify(serialized_cart_item), 200
+            else:
+                return {'error': 'Cart item not found'}, 404
+
+        except Exception as e:
+            db.session.rollback()
+            return {'error': str(e)}, 400
+        
+    def delete(self, item_id):
+        current_user_id = get_jwt_identity()
+
+        try:
+            # Find the cart item with the specified item_id belonging to the current user
+            cart_item = CartItem.query.filter_by(id=item_id, cart_id=current_user_id).first()
+
+            if cart_item:
+                # Delete the cart item from the database
+                db.session.delete(cart_item)
+
+                # Commit the changes to the database
+                db.session.commit()
+
+                return {'message': 'Cart item deleted successfully'}, 200
+            else:
+                return {'error': 'Cart item not found'}, 404
+
+        except Exception as e:
+            db.session.rollback()
+            return {'error': str(e)}, 400
+
+api.add_resource(ShoppingCart,'/userCart')
+
+class UserShippingDetails(Resource):
+    @jwt_required()
+    def get(self):
+        current_user_id = get_jwt_identity()
+        details = ShippingAddress.query.filter_by(user_id=current_user_id).all()
+
+        aggregated_details = []
+
+        for detail in details:
+            shipping_details = {
+                'details_id': detail.id,
+                'address_line1': detail.address_line1,
+                'address_line2': detail.address_line2,
+                'city': detail.city,
+                'postal_code': detail.postal_code,
+                'country': detail.country
+            }
+            aggregated_details.append(shipping_details)
+
+        return make_response(aggregated_details, 200)
+    
+
+    @jwt_required()
+    def post(self):
+        current_user_id = get_jwt_identity()
+        data = request.json
+
+        new_shipping_details = ShippingAddress(
+            address_line1=data.get('address_line1'),
+            address_line2=data.get('address_line2'),
+            city=data.get('city'),
+            postal_code=data.get('postal_code'),
+            country=data.get('country'),
+            user_id=current_user_id
+        )
+
+        db.session.add(new_shipping_details)
+        db.session.commit()
+
+        return make_response(new_shipping_details.to_dict(), 201)
+    
+    @jwt_required()
+    def patch(self):
+        current_user_id = get_jwt_identity()
+        data = request.json
+
+        try:
+            updated_address_line1 = data.get('address_line1')
+            updated_address_line2 = data.get('address_line2')
+            updated_city = data.get('city')
+            updated_postal_code = data.get('postal_code')
+            updated_country = data.get('country')
+
+            # Query the shipping address for the current user
+            user_shipping_address = ShippingAddress.query.filter_by(user_id=current_user_id).first()
+
+            if user_shipping_address:
+                # Update the address details
+                user_shipping_address.address_line1 = updated_address_line1
+                user_shipping_address.address_line2 = updated_address_line2
+                user_shipping_address.city = updated_city
+                user_shipping_address.postal_code = updated_postal_code
+                user_shipping_address.country = updated_country
+
+                # Commit the changes
+                db.session.commit()
+
+                return make_response(user_shipping_address.to_dict(), 200)
+            else:
+                return make_response({'error': 'Shipping address not found'}, 404)
+
+        except Exception as e:
+            db.session.rollback()
+            return make_response({'error': str(e)}, 400)
+
+api.add_resource(UserShippingDetails, '/userShippingAddress')
 
 
 # Admin Side

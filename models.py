@@ -42,8 +42,9 @@ class User(db.Model, SerializerMixin):
 
     productorders = relationship("ProductOrder", back_populates="user")
     serviceorders = relationship("ServiceOrder", back_populates="user")
+    cart = relationship("Cart", uselist=False, back_populates="user")
 
-    serialize_rules = ('-productorders.user', '-serviceorders.user')
+    serialize_rules = ('-productorders.user', '-serviceorders.user', '-cart.user')
 
     @validates('password')
     def validate_password(self, key, password):
@@ -98,8 +99,9 @@ class ProductOrder(db.Model, SerializerMixin):
 
     #Added order_items relationship to the ProductOrder model to represent the items in the order.
     product_order_items = relationship("ProductOrderItem", back_populates="product_order")
+    shipping_address = relationship("ShippingAddress", back_populates="product_order")
 
-    serialize_rules = ('-product_order_items.order', '-user.productorders.product_order_items')
+    serialize_rules = ('-product_order_items.product_order', '-user.productorders.product_order_items')
 
     def __repr__(self):
         return f'<ProductOrder {self.id}>'
@@ -117,7 +119,7 @@ class ProductOrderItem(db.Model, SerializerMixin):
     product_order = relationship("ProductOrder", back_populates="product_order_items")
     product = relationship("Product", back_populates="product_order_items")
 
-    serialize_rules = ('-product_order.product_order_items.product', '-product.product_order_items')
+    serialize_rules = ('-product_order.product_order_items.product', '-product.product_order_items', '-shipping_address')
 
 
     def __repr__(self):
@@ -163,8 +165,9 @@ class ServiceOrder(db.Model, SerializerMixin):
 
     #Added order_items relationship to the ServiceOrder model to represent the items in the order.
     service_order_items = relationship("ServiceOrderItem", back_populates="service_order")
+    shipping_address = relationship('ShippingAddress', back_populates='service_order')
 
-    serialize_rules = ('-service_order_items.order', '-user.serviceorders.service_order_items')
+    serialize_rules = ('-service_order_items.service_order', '-user.serviceorders.service_order_items', '-shipping_address')
 
     def __repr__(self):
         return f'<ServiceOrder {self.id}>'
@@ -187,3 +190,55 @@ class ServiceOrderItem(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f'< {self.id}>'
+    
+class Cart(db.Model, SerializerMixin):
+    __tablename__ = "carts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user = relationship("User", back_populates="cart")
+    cart_items = relationship("CartItem", back_populates="cart")
+
+    serialize_rules = ('-user.cart', '-cart_items.cart')
+
+    def __repr__(self):
+        return f'<Cart {self.id}>'
+
+class CartItem(db.Model, SerializerMixin):
+    __tablename__ = "cart_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'))
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('services.id'))
+    quantity = db.Column(db.Integer, nullable=False)
+
+    product = relationship("Product")
+    service = relationship("Service")
+    cart = relationship("Cart", back_populates="cart_items")
+
+    serialize_rules = ('-cart.cart_items', '-product', '-service')
+
+    def __repr__(self):
+        return f'<CartItem {self.id}>'
+
+class ShippingAddress(db.Model, SerializerMixin):
+    __tablename__ = "shipping_addresses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    address_line1 = db.Column(db.String, nullable=False)
+    address_line2 = db.Column(db.String, nullable=True)
+    city = db.Column(db.String, nullable=False)
+    postal_code = db.Column(db.String, nullable=False)
+    country = db.Column(db.String, nullable=False)
+
+    product_order_id = db.Column(db.Integer, db.ForeignKey('productorders.id'))
+    service_order_id = db.Column(db.Integer, db.ForeignKey('serviceorders.id'))
+
+    product_order = relationship("ProductOrder", back_populates="shipping_address")
+    service_order = relationship("ServiceOrder", back_populates="shipping_address")
+
+    serialize_rules = ('-product_order.shipping_address', '-service_order.shipping_address')
+
+    def __repr__(self):
+        return f'<ShippingAddress {self.id}>'
