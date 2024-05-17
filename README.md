@@ -49,7 +49,7 @@ Database: MySQL
 
 
 ### Technologies Used
-(To fill)
+(To fill/WIP)
 
 ### Setup Instructions
 Clone the repository to your local machine. Set up the backend server. Connect the frontend to the backend by configuring appropriate API endpoints. Run the application and start exploring pet products and services!
